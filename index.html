@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Camera App</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<div id="container">
+		<video id="video" autoplay playsinline></video>
+		<button id="recordButton" class="record">REC</button>
+		<div id="timerContainer">
+			<div id="timer"></div>
+		</div>
+	</div>
+	<script>
+		const video = document.getElementById('video');
+		const recordButton = document.getElementById('recordButton');
+		const timerContainer = document.getElementById('timerContainer');
+		const timer = document.getElementById('timer');
+		let stream, mediaRecorder, chunks = [];
+		let startTime, timerInterval;
+
+		const startCamera = async () => {
+			try {
+				stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+				video.srcObject = stream;
+			} catch (err) {
+				console.error(err);
+			}
+		};
+
+		const stopCamera = () => {
+			if (stream) {
+				stream.getTracks().forEach(track => track.stop());
+				video.srcObject = null;
+			}
+		};
+
+		const startRecording = () => {
+			chunks = [];
+			mediaRecorder = new MediaRecorder(stream);
+			mediaRecorder.addEventListener('dataavailable', event => {
+				chunks.push(event.data);
+			});
+			mediaRecorder.addEventListener('stop', () => {
+				const blob = new Blob(chunks, { type: 'video/mp4' });
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = 'recording.mp4';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+				recordButton.classList.remove('stop');
+				recordButton.classList.add('record');
+				recordButton.textContent = 'REC';
+			});
+			
+			startTime = Date.now();
+            timerContainer.classList.add('active');
+            timerInterval = setInterval(() => {
+                const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+                timer.textContent = `${elapsedTime}s`;
+            }, 1000);
+			recordButton.classList.remove('record');
+			recordButton.classList.add('stop');
+			recordButton.textContent = 'STOP';
+            mediaRecorder.start();
+		};
+
+		const stopRecording = () => {
+			mediaRecorder.stop();
+			stopCamera();
+            clearInterval(timerInterval);
+            timerContainer.classList.remove('active');
+            timer.textContent = '0s';
+
+            setTimeout(() => {
+                startCamera();
+            },500)
+		};
+
+        startCamera();
+
+		recordButton.addEventListener('click', () => {
+			if (mediaRecorder && mediaRecorder.state === 'recording') {
+				stopRecording();
+			} else {
+				startCamera();
+				startRecording();
+			}
+		});
+
+	</script>
+</body>
+</html>
